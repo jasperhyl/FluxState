@@ -35,7 +35,7 @@ private:
   Token MakeToken(TokenType type, const std::string &lexeme, int line, int column) const;
 
   std::string _source;
-  size_t _current = 0;
+  size_t _current = 0; //_source中当前被读取的字符的下标
   int _line = 1;
   int _column = 1;
 };

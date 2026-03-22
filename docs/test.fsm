@@ -1,0 +1,313 @@
+//这是个示例程序，用于对设计方案辅以代码说明
+//在这个程序中，模拟了门禁系统，包括3 个 machine：
+/*
+* 1.AccessControl:门禁主逻辑
+* 2.DoorMotor:门电机控制
+* 3.AuditLogger:审计日志
+*/
+//定义主machine
+//每个machine会转化成一个struct
+//typedef struct {
+//    uint32_t current_state;//当前状态
+//    uint32_t flags;//运行时标志位
+//    uint64_t entered_at_ns;//当前machine进入当前state的时间点
+//    struct FS_EventQueue* queue;//这个machine的事件队列
+//    struct FS_TimerTable* timers;//记录这个 machine 当前挂着哪些“未来要触发的时间事件”。当状态机进入某个带 after 的状态时，runtime 可以注册一个 timer
+// }
+//同时对于每个machine还会生成自己的env
+//如果这个值需要在多次事件之间持续存在，并且属于该 machine 自己的内部上下文，那就应该放进 env
+//以AcessControl为例子，以下两个就属于该machine的环境变量
+//    bool busy = false;
+//    int deny_count = 0;
+//他们被转化为：
+//typedef struct {
+//    uint8_t busy;
+//    int32_t deny_count;
+//} AccessControl_Env;
+//对于flag字段，用来记录一些附加状态，但这些状态又不适合单独做成业务变量
+//例如：
+// machine 当前是否正在 dispatch
+// machine 是否已经停止
+// machine 是否处于错误状态
+// machine 是否有待处理的 timer
+// machine 是否需要重调度
+// 转化成：
+// enum {
+//    FS_MACHINE_RUNNING   = 1u << 0,
+//    FS_MACHINE_STOPPED   = 1u << 1,
+//    FS_MACHINE_IN_STEP   = 1u << 2,
+//    FS_MACHINE_HAS_ERROR = 1u << 3
+//};
+//然后：
+//m->hdr.flags |= FS_MACHINE_IN_STEP;
+
+//对于FS_EventQueue:
+//无论事件来自哪里：
+//外部输入
+//其他 machine 的 emit
+//timer 到期产生的内部 timeout event
+//最终都先进这个 queue，然后由 dispatch loop 按顺序处理。
+
+//对于TimerTable:
+//当状态机进入某个带 after 的状态时，runtime 可以注册一个 timer：
+//比如：
+//from Granted after 1s -> Idle
+//进入 Granted 后，runtime 可能会在 timers 里放一条记录：
+//截止时间：now + 1s
+//到期后要投递的事件：EV_timeout_Granted_1s
+//等时间到了，不是直接改状态，而是：
+//1.timer 到期
+//2.生成一个内部 timeout event
+//3.放进该 machine 的 queue
+//4.再由正常 dispatch 逻辑处理
+//所以 timers 本质上是“未来事件预约表”。
+
+machine AccessControl {
+    //涉及4种状态:闲置，检查中，允许进入，拒绝进入
+    state Idle, Checking, Granted, Denied;
+    //每个machine会生成自己的状态枚举
+    //typedef struct {
+    //    ST_AccessControl_Idle = 0;
+    //    ST_AccessControl_Checking = 1;
+    //    ST_AccessControl_Granted = 2;
+    //    ST_AccessControl_Denied = 3;
+    //}
+    
+    //初始化为闲置状态,即current_state被设置为0
+    initial Idle;
+
+    //busy和deny_count作为非业务但是需要持久留存的环境变量，会被转化为：
+    //typedef struct {
+    //    uint8_t busy;
+    //    int32_t deny_count;
+    //} ENV_AccessControl;
+    bool busy = false;
+    int deny_count = 0;
+
+    //定义事件
+    //所有的事件会被转化为：
+    //typedef struct {
+    // uint32_t tag;//标记事件，比如EV_CardScanned，EV_AuthOk
+    // uint32_t flags;//说明这个payload该不该由runtime释放
+    // uint16_t reserved;//这是个保留字段，后面可能会用于事件优先级，事件来源或者分发策略
+    // uint32_t payload_size;
+    // void* payload;//event附带的参数
+    // uint64_t timestamp_ns;//还没有确定这个字段是用于事件被创建，投递还是入队时间。应该是用于事件的创建时间
+    //} FS_Event;
+    //每个machine声明的event,会统一变成以下：
+    //typedef enum {
+    // EV_AccessControl_cardScanned = 1,
+    // EV_AccessControl_authOk = 2,
+    // EV_AccessControl_authFail = 3
+    //} AccessControl_EventTag;
+
+    //cardScanned的payload会存储：
+    //typedef struct {
+    // FS_String user_id;
+    // FS_String role;
+    // } FS_Payload_AccessControl_cardScanned;
+
+    event cardScanned(string user_id, string role);
+    event authOk(string user_id);
+    event authFail(string user_id, int reason);
+    event reset();
+
+    from Idle on cardScanned(user_id, role) -> Checking
+    do {
+        busy = true;
+        if (role == "admin" || role == "staff") {
+            emit(this, authOk(user_id));//没有立即执行“认证成功”，而是投递到自己的event队列里面，由后续统一dispatch
+            //这个emit会转化成以下：
+            //static bool AccessControl_emit_authOk(AccessControl_Machine* dst,FS_String user_id,uint64_t now_ns) {
+            //    FS_Payload_AccessControl_authOk* p =
+            //        (FS_Payload_AccessControl_authOk*)malloc(sizeof(*p));
+            //    if (!p) return false;
+            //    p->user_id = user_id;
+            //    FS_Event ev;
+            //    ev.tag = EV_AccessControl_authOk;
+            //    ev.flags = FS_EVENT_OWNS_PAYLOAD;
+            //    ev.reserved = 0;
+            //    ev.payload_size = (uint32_t)sizeof(*p);
+            //    ev.payload = p;
+            //    ev.timestamp_ns = now_ns;
+            //    if (!fs_queue_push(dst->hdr.queue, ev)) {
+            //        free(p);
+            //        return false;
+            //    }
+            //    return true;
+            //}
+        } else {
+            emit(this, authFail(user_id, 403));
+        }
+    }
+    
+    //整个transition事件会被转化成：
+    //static bool fs_string_eq_cstr(FS_String s, const char* lit);
+    //bool AccessControl_step(AccessControl_Machine* m,const FS_Event* e,uint64_t now_ns) {
+    //    switch (m->hdr.current_state) {
+    //        case ST_AccessControl_Idle:
+    //            switch (e->tag) {
+    //                case EV_AccessControl_cardScanned: {
+    //                    const FS_Payload_AccessControl_cardScanned* p =
+    //                        (const FS_Payload_AccessControl_cardScanned*)e->payload;
+
+    //                    // 1) 状态迁移：Idle -> Checking
+    //                    m->hdr.current_state = ST_AccessControl_Checking;
+    //                    m->hdr.entered_at_ns = now_ns;
+
+    //                    // 2) 执行动作：busy = true
+    //                    m->env.busy = 1;
+
+    //                    // 3) 根据 role 自发后续事件
+    //                    if (fs_string_eq_cstr(p->role, "admin") ||
+    //                        fs_string_eq_cstr(p->role, "staff")) {
+    //                        if (!AccessControl_emit_authOk(m, p->user_id, now_ns)) {
+    //                            return false;
+    //                        }
+    //                    } else {
+    //                        if (!AccessControl_emit_authFail(m, p->user_id, 403, now_ns)) {
+    //                            return false;
+    //                        }
+    //                    }
+
+    //                    return true;
+    //                }
+    //            }
+    //            return false;
+
+    //        default:
+    //            return false;
+    //    }
+    //}
+
+
+
+
+
+    from Checking on authOk(user_id) -> Granted
+    do {
+        emit(DoorMotor, unlockCmd(user_id));
+        emit(AuditLogger, accessGranted(user_id));
+    }
+
+    from Checking on authFail(user_id, reason) -> Denied
+    do {
+        deny_count = deny_count + 1;
+        emit(AuditLogger, accessDenied(user_id, reason));
+    }
+
+    from Granted after 1s -> Idle
+    do {
+        busy = false;
+    }
+    //所有的timeout，都会由编译器自动生成内部事件，比如
+    // typedef enum {
+    // EV_AccessControl_cardScanned = 1,
+    // EV_AccessControl_authOk = 2,
+    // EV_AccessControl_authFail = 3,
+
+    // EV_AccessControl_timeout_Granted_1s = 100//内部事件
+    //} AccessControl_EventTag;
+
+    //并在timer中注册
+    //typedef struct {
+    // uint64_t deadline_ns;//deadline_ns = now + 1s
+    // uint32_t event_tag;//event_tag = EV_AccessControl_timeout_Granted_1s
+    // uint16_t retry_left;
+    // uint8_t active;//active = 1
+    // uint8_t kind;//kind = 一次性FS_TIMER_ONESHOT或者kind = FS_TIMER_PERIODIC周期性
+    // } FS_Timer;
+
+
+    from Denied after 2s -> Idle
+    do {
+        busy = false;
+    }
+    
+    //guard事件
+    from Checking on authFail(user_id, reason) when reason == 403 -> Denied
+    do {
+        deny_count = deny_count + 1;
+        emit(AuditLogger, accessDenied(user_id, reason));
+    }
+    //guard事件会被转化成:
+    //case ST_AccessControl_Checking:
+    //switch (e->tag) {
+    //    case EV_AccessControl_authFail: {
+    //        const FS_Payload_AccessControl_authFail* p =
+    //            (const FS_Payload_AccessControl_authFail*)e->payload;
+
+    //        // when reason == 403
+    //        if (!(p->reason == 403)) {//就是在transition上加了一个if
+    //            return false;
+    //        }
+
+    //        // 状态迁移：Checking -> Denied
+    //        m->hdr.current_state = ST_AccessControl_Denied;
+    //        m->hdr.entered_at_ns = now_ns;
+
+    //        // do { deny_count = deny_count + 1; }
+    //        m->env.deny_count = m->env.deny_count + 1;
+
+    //        // emit(AuditLogger, accessDenied(user_id, reason));
+    //        if (!AuditLogger_emit_accessDenied(logm, p->user_id, p->reason, now_ns)) {
+    //            return false;
+    //        }
+
+    //        return true;
+    //    }
+    //}
+    //return false;
+}
+
+//定义machine
+machine DoorMotor {
+    state Locked, Unlocked;
+    initial Locked;
+
+    bool opened = false;
+
+    event unlockCmd(string user_id);
+    event timeoutUnlock();
+
+    from Locked on unlockCmd(user_id) -> Unlocked
+    do {
+        opened = true;
+        log("door unlocked for " + user_id);
+    }
+
+    from Unlocked after 5s -> Locked
+    do {
+        opened = false;
+        emit(AuditLogger, doorClosed());
+    }
+}
+
+machine AuditLogger {
+    state Ready;
+    initial Ready;
+
+    int log_count = 0;
+
+    event accessGranted(string user_id);
+    event accessDenied(string user_id, int reason);
+    event doorClosed();
+
+    from Ready on accessGranted(user_id) -> Ready
+    do {
+        log_count = log_count + 1;
+        log("grant: " + user_id);
+    }
+
+    from Ready on accessDenied(user_id, reason) -> Ready
+    do {
+        log_count = log_count + 1;
+        log("deny: " + user_id);
+    }
+
+    from Ready on doorClosed() -> Ready
+    do {
+        log_count = log_count + 1;
+        log("door closed");
+    }
+}

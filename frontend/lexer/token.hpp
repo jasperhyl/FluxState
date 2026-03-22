@@ -24,6 +24,8 @@ enum class TokenType {
   Star,         // *
   Slash,        // /
   Bang,         // !
+  BitAnd,       // &
+  BitOr,        // |
   EqualEqual,   // ==
   BangEqual,    // !=
   Less,         // <
@@ -32,6 +34,8 @@ enum class TokenType {
   GreaterEqual, // >=
   AndAnd,       // &&
   OrOr,         // ||
+  Decrement,    // --
+  Increment,    // ++
 
   // Keywords
   KwMachine,
