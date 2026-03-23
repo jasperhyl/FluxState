@@ -8,7 +8,7 @@
 namespace flux {
 namespace {
 // 定义KeyWordMap
-const std::unordered_map<std::string, TokenType> KeyWordMap = {
+const std::unordered_map<std::string, TokenType> KeywordMap = {
     {"machine", TokenType::KwMachine},
     {"state", TokenType::KwState},
     {"event", TokenType::KwEvent},
@@ -187,6 +187,127 @@ bool Lexer::Match(char expected) {
   } else {
     return true;
   }
+}
+
+void Lexer::SkipWhitespaceAndComments() {
+  while (!IsAtEnd()) {
+    const char c = Peek();
+    if (std::isspace(static_cast<unsigned char>(c))) {
+      Advance();
+      continue;
+    }
+
+    if (c == '/' && PeekNext() == '/') {
+      Advance();
+      Advance();
+      while (!IsAtEnd() && PeekNext() != '\n') {
+        Advance();
+      }
+      continue; // 让isspace消费掉最后的/n
+    }
+
+    if (c == '/' && PeekNext() == '*') {
+      Advance();
+      Advance();
+      bool closed = false;
+      while (!IsAtEnd()) {
+        if (Peek() == '*' && PeekNext() == '/') {
+          Advance();
+          Advance();
+          closed = true;
+          break;
+        }
+        Advance();
+      }
+      if (closed == false) {
+        std::runtime_error(BuildError("Unterminated block comment", _line, _column));
+      }
+      continue; // 当出现/*a*//*b*/需要continue再走一遍/*的判断逻辑
+    }
+    break;
+  }
+}
+
+Token Lexer::LexIdentifierOrKeyword(int line, int column) {
+  const size_t start = _current;
+  // 先截取出来标识符或者关键字，再判断他是标识符还是关键字
+  // 只要遇到不是字母，数字，下划线，就暂停截取
+  // 读到_source的末尾也要暂停（即读到文件末尾也暂停）
+  while (!IsAtEnd()) {
+    const char c = Peek();
+    if (std::isalnum(static_cast<unsigned char>(c)) || c != '_') {
+      Advance();
+    } else {
+      break;
+    }
+  }
+
+  std::string lexeme = _source.substr(start, _current - start);
+  const auto it = KeywordMap.find(lexeme);
+  if (it != KeywordMap.end()) {
+    return MakeToken(it->second, lexeme, line, column);
+  }
+  return MakeToken(TokenType::Identifier, lexeme, line, column);
+}
+
+Token Lexer::LexNumber(int line, int column) {
+  const size_t start = _current;
+  while (!IsAtEnd()) {
+    if (std::isdigit(static_cast<unsigned char>(Peek()))) {
+      Advance();
+    } else {
+      break;
+    }
+  }
+  std::string lexeme = _source.substr(start, _current - start);
+  return MakeToken(TokenType::IntegerLiteral, lexeme, line, column);
+}
+
+Token Lexer::LexString(int line, int column) {
+  Advance(); // 消费掉引号
+  std::string str;
+  while (!IsAtEnd() && PeekNext() != '"') { // 退出while循环的时候，这两个只有可能其中一个不满足
+    const char c = Advance();
+    if (c == '\\') {
+      // 这里使用严格转译，如果\后没有下列的转译字母，就build error
+      if (IsAtEnd()) {
+        throw std::runtime_error(BuildError("invalid escape sequence", line, column));
+      }
+      const char esc = Advance();
+      switch (esc) {
+      case 'n':
+        str.push_back('\n');
+        break;
+      case 't':
+        str.push_back('\t');
+        break;
+      case '"':
+        str.push_back('"');
+        break;
+      case '\\':
+        str.push_back('\\');
+        break;
+      default:
+        throw std::runtime_error(BuildError("unsupported escape sequence", line, column));
+      }
+    } else {
+      str.push_back(c);
+    }
+  }
+  if (IsAtEnd()) {
+    throw std::runtime_error(BuildError("unterminated string literal", line, column));
+  }
+  Advance();
+  return MakeToken(TokenType::StringLiteral, str, line, column);
+}
+
+Token Lexer::MakeToken(TokenType type, const std::string &lexeme, int line, int column) const {
+  Token token;
+  token.type = type;
+  token.lexeme = lexeme;
+  token.line = line;
+  token.column = column;
+  return token;
 }
 
 } // namespace flux
