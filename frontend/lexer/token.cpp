@@ -37,6 +37,10 @@ std::string TokenTypeToString(TokenType type) {
     return "/";
   case TokenType::Bang:
     return "!";
+  case TokenType::BitAnd:
+    return "&";
+  case TokenType::BitOr:
+    return "|";
   case TokenType::EqualEqual:
     return "==";
   case TokenType::BangEqual:
@@ -53,6 +57,10 @@ std::string TokenTypeToString(TokenType type) {
     return "&&";
   case TokenType::OrOr:
     return "||";
+  case TokenType::Increment:
+    return "++";
+  case TokenType::Decrement:
+    return "--";
   case TokenType::KwMachine:
     return "machine";
   case TokenType::KwState:

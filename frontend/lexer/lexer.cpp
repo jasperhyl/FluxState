@@ -11,6 +11,7 @@ namespace {
 const std::unordered_map<std::string, TokenType> KeywordMap = {
     {"machine", TokenType::KwMachine},
     {"state", TokenType::KwState},
+  {"initial", TokenType::KwInitial},
     {"event", TokenType::KwEvent},
     {"transition", TokenType::KwTransition},
     {"guard", TokenType::KwGuard},
@@ -134,7 +135,7 @@ std::vector<Token> Lexer::Tokenize() {
       break;
     case '&':
       if (Match('&')) {
-        tokens.push_back(MakeToken(TokenType::OrOr, "&&", token_line, token_col));
+        tokens.push_back(MakeToken(TokenType::AndAnd, "&&", token_line, token_col));
       } else {
         tokens.push_back(MakeToken(TokenType::BitAnd, "&", token_line, token_col));
       }
@@ -185,6 +186,7 @@ bool Lexer::Match(char expected) {
   if (IsAtEnd() || _source[_current] != expected) {
     return false;
   } else {
+    Advance();
     return true;
   }
 }
@@ -200,7 +202,7 @@ void Lexer::SkipWhitespaceAndComments() {
     if (c == '/' && PeekNext() == '/') {
       Advance();
       Advance();
-      while (!IsAtEnd() && PeekNext() != '\n') {
+      while (!IsAtEnd() && Peek() != '\n') {
         Advance();
       }
       continue; // 让isspace消费掉最后的/n
@@ -220,7 +222,7 @@ void Lexer::SkipWhitespaceAndComments() {
         Advance();
       }
       if (closed == false) {
-        std::runtime_error(BuildError("Unterminated block comment", _line, _column));
+        throw std::runtime_error(BuildError("Unterminated block comment", _line, _column));
       }
       continue; // 当出现/*a*//*b*/需要continue再走一遍/*的判断逻辑
     }
@@ -235,7 +237,7 @@ Token Lexer::LexIdentifierOrKeyword(int line, int column) {
   // 读到_source的末尾也要暂停（即读到文件末尾也暂停）
   while (!IsAtEnd()) {
     const char c = Peek();
-    if (std::isalnum(static_cast<unsigned char>(c)) || c != '_') {
+    if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') {
       Advance();
     } else {
       break;
@@ -266,7 +268,7 @@ Token Lexer::LexNumber(int line, int column) {
 Token Lexer::LexString(int line, int column) {
   Advance(); // 消费掉引号
   std::string str;
-  while (!IsAtEnd() && PeekNext() != '"') { // 退出while循环的时候，这两个只有可能其中一个不满足
+  while (!IsAtEnd() && Peek() != '"') { // 退出while循环的时候，这两个只有可能其中一个不满足
     const char c = Advance();
     if (c == '\\') {
       // 这里使用严格转译，如果\后没有下列的转译字母，就build error
@@ -297,7 +299,7 @@ Token Lexer::LexString(int line, int column) {
   if (IsAtEnd()) {
     throw std::runtime_error(BuildError("unterminated string literal", line, column));
   }
-  Advance();
+  Advance(); // 消费右引号
   return MakeToken(TokenType::StringLiteral, str, line, column);
 }
 
