@@ -47,9 +47,16 @@ struct CallExpr final : Expr {
   std::vector<std::unique_ptr<Expr>> args;
 };
 
-// 赋值语句，这里写成Expr,所以是支持链式赋值的
-struct AssignStmt final : Expr {
+// 赋值语句，这里写成Expr,支持链式赋值的
+struct AssignExpr final : Expr {
   std::unique_ptr<Expr> lhs;
   std::unique_ptr<Expr> rhs;
 };
+
+// //when语句
+// struct GuardExpr final : Expr{
+//   std::unique_ptr<Expr> lhs;
+//   Binary
+// }
+
 } // namespace flux

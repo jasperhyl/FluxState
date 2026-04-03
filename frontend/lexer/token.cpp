@@ -35,11 +35,9 @@ std::string TokenTypeToString(TokenType type) {
     return "*";
   case TokenType::Slash:
     return "/";
-  case TokenType::Bang:
-    return "!";
-  case TokenType::BitAnd:
+  case TokenType::Ampersand:
     return "&";
-  case TokenType::BitOr:
+  case TokenType::Pipe:
     return "|";
   case TokenType::EqualEqual:
     return "==";
@@ -85,6 +83,8 @@ std::string TokenTypeToString(TokenType type) {
     return "after";
   case TokenType::KwDo:
     return "do";
+  case TokenType::KwEmit:
+    return "emit";
   case TokenType::KwInt:
     return "int";
   case TokenType::KwShort:

@@ -19,13 +19,13 @@ enum class TokenType {
   Assign,    // =
 
   // Operators
-  Plus,         // +
-  Minus,        // -
-  Star,         // *
-  Slash,        // /
-  Bang,         // !
-  BitAnd,       // &
-  BitOr,        // |
+  Plus,  // +
+  Minus, // -
+  Star,  // *
+  Slash, // /
+  // Bang,         // !//暂时不支持
+  Ampersand,    // &
+  Pipe,         // |
   EqualEqual,   // ==
   BangEqual,    // !=
   Less,         // <
@@ -50,6 +50,7 @@ enum class TokenType {
   KwWhen,
   KwAfter,
   KwDo,
+  KwEmit,
   KwInt,
   KwShort,
   KwFloat,

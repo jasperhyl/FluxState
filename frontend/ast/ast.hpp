@@ -1,6 +1,6 @@
 #pragma once
 namespace flux {
-enum class TypeKind {
+enum class ValueType {
   Invalid, // 语义错误占位
   Bool,
   Char,
@@ -13,9 +13,9 @@ enum class TypeKind {
 
 // 一元运算符
 enum class UnaryOp {
-  Neg,       //-
-  Plus,      //+
-  Not,       //!
+  Neg,  //-
+  Plus, //+
+  // Not,       //!
   AddressOf, //&
   Deref,     //*
   // BitNot,    //~不支持
@@ -31,7 +31,7 @@ enum class BinaryOp {
   Sub, // -
   Mul, // *
   Div, // /
-  Mod, // %
+  // Mod, // %暂时不支持
   // 比较
   Eq, // ==
   Ne, // !=
