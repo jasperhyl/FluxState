@@ -1,6 +1,8 @@
 #include "token.hpp"
 #include <string>
+
 namespace flux {
+
 std::string TokenTypeToString(TokenType type) {
   switch (type) {
   case TokenType::EndOfFile:
@@ -35,9 +37,11 @@ std::string TokenTypeToString(TokenType type) {
     return "*";
   case TokenType::Slash:
     return "/";
-  case TokenType::Ampersand:
+  case TokenType::Bang:
+    return "!";
+  case TokenType::BitAnd:
     return "&";
-  case TokenType::Pipe:
+  case TokenType::BitOr:
     return "|";
   case TokenType::EqualEqual:
     return "==";

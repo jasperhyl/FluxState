@@ -5,7 +5,9 @@
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
+
 namespace flux {
+
 namespace {
 // 定义KeyWordMap
 const std::unordered_map<std::string, TokenType> KeywordMap = {
@@ -20,6 +22,7 @@ const std::unordered_map<std::string, TokenType> KeywordMap = {
     {"on", TokenType::KwOn},
     {"when", TokenType::KwWhen},
     {"do", TokenType::KwDo},
+    {"emit", TokenType::KwEmit},   // 新增这一行
     {"after", TokenType::KwAfter},
     {"int", TokenType::KwInt},
     {"char", TokenType::KwChar},
@@ -35,7 +38,9 @@ const std::unordered_map<std::string, TokenType> KeywordMap = {
     {"h", TokenType::KwH},
 };
 } // namespace
+
 Lexer::Lexer(std::string source) : _source(std::move(source)) {}
+
 std::vector<Token> Lexer::Tokenize() {
   std::vector<Token> tokens;
   while (!IsAtEnd()) {
@@ -47,15 +52,14 @@ std::vector<Token> Lexer::Tokenize() {
     const int token_line = _line;
     const int token_col = _column;
     const char c = Advance();
-    // 识别是不是标识符或者keyword的起点
+
     if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
-      // 在进入if之前，已经advance一次了，所以要回退一下，让处理函数从该单词的开头开始读取
       _current--;
       _column--;
       tokens.push_back(LexIdentifierOrKeyword(token_line, token_col));
       continue;
     }
-    // 识别是不是数字
+
     if (std::isdigit(static_cast<unsigned char>(c))) {
       _current--;
       _column--;
@@ -63,7 +67,6 @@ std::vector<Token> Lexer::Tokenize() {
       continue;
     }
 
-    // 都不是的话，那只能是运算符号了
     switch (c) {
     case '{':
       tokens.push_back(MakeToken(TokenType::LBrace, "{", token_line, token_col));
@@ -109,7 +112,7 @@ std::vector<Token> Lexer::Tokenize() {
       if (Match('=')) {
         tokens.push_back(MakeToken(TokenType::BangEqual, "!=", token_line, token_col));
       } else {
-        throw std::runtime_error(BuildError("暂时不支持!", _line, _column));
+        tokens.push_back(MakeToken(TokenType::Bang, "!", token_line, token_col));
       }
       break;
     case '=':
@@ -137,14 +140,14 @@ std::vector<Token> Lexer::Tokenize() {
       if (Match('&')) {
         tokens.push_back(MakeToken(TokenType::AndAnd, "&&", token_line, token_col));
       } else {
-        tokens.push_back(MakeToken(TokenType::Ampersand, "&", token_line, token_col));
+        tokens.push_back(MakeToken(TokenType::BitAnd, "&", token_line, token_col));
       }
       break;
     case '|':
       if (Match('|')) {
         tokens.push_back(MakeToken(TokenType::OrOr, "||", token_line, token_col));
       } else {
-        tokens.push_back(MakeToken(TokenType::Pipe, "|", token_line, token_col));
+        tokens.push_back(MakeToken(TokenType::BitOr, "|", token_line, token_col));
       }
       break;
     case '"':
@@ -205,7 +208,7 @@ void Lexer::SkipWhitespaceAndComments() {
       while (!IsAtEnd() && Peek() != '\n') {
         Advance();
       }
-      continue; // 让isspace消费掉最后的/n
+      continue;
     }
 
     if (c == '/' && PeekNext() == '*') {
@@ -224,7 +227,7 @@ void Lexer::SkipWhitespaceAndComments() {
       if (closed == false) {
         throw std::runtime_error(BuildError("Unterminated block comment", _line, _column));
       }
-      continue; // 当出现/*a*//*b*/需要continue再走一遍/*的判断逻辑
+      continue;
     }
     break;
   }
@@ -232,9 +235,6 @@ void Lexer::SkipWhitespaceAndComments() {
 
 Token Lexer::LexIdentifierOrKeyword(int line, int column) {
   const size_t start = _current;
-  // 先截取出来标识符或者关键字，再判断他是标识符还是关键字
-  // 只要遇到不是字母，数字，下划线，就暂停截取
-  // 读到_source的末尾也要暂停（即读到文件末尾也暂停）
   while (!IsAtEnd()) {
     const char c = Peek();
     if (std::isalnum(static_cast<unsigned char>(c)) || c == '_') {
@@ -268,10 +268,9 @@ Token Lexer::LexNumber(int line, int column) {
 Token Lexer::LexString(int line, int column) {
   Advance(); // 消费掉引号
   std::string str;
-  while (!IsAtEnd() && Peek() != '"') { // 退出while循环的时候，这两个只有可能其中一个不满足
+  while (!IsAtEnd() && Peek() != '"') {
     const char c = Advance();
     if (c == '\\') {
-      // 这里使用严格转译，如果\后没有下列的转译字母，就build error
       if (IsAtEnd()) {
         throw std::runtime_error(BuildError("invalid escape sequence", line, column));
       }

@@ -1,8 +1,9 @@
 #pragma once
 #include <string>
-namespace flux {
-enum class TokenType {
 
+namespace flux {
+
+enum class TokenType {
   EndOfFile,
   Identifier,
   IntegerLiteral,
@@ -19,23 +20,23 @@ enum class TokenType {
   Assign,    // =
 
   // Operators
-  Plus,  // +
-  Minus, // -
-  Star,  // *
-  Slash, // /
-  // Bang,         // !//暂时不支持
-  Ampersand,    // &
-  Pipe,         // |
-  EqualEqual,   // ==
-  BangEqual,    // !=
-  Less,         // <
-  LessEqual,    // <=
-  Greater,      // >
+  Plus,       // +
+  Minus,      // -
+  Star,       // *
+  Slash,      // /
+  Bang,       // !
+  BitAnd,     // &
+  BitOr,      // |
+  EqualEqual, // ==
+  BangEqual,  // !=
+  Less,       // <
+  LessEqual,  // <=
+  Greater,    // >
   GreaterEqual, // >=
-  AndAnd,       // &&
-  OrOr,         // ||
-  Decrement,    // --
-  Increment,    // ++
+  AndAnd,     // &&
+  OrOr,       // ||
+  Decrement,  // --
+  Increment,  // ++
 
   // Keywords
   KwMachine,
@@ -62,14 +63,16 @@ enum class TokenType {
   KwFalse,
   KwH,
   KwM,
-  KwS, // time suffix: 10s -> IntegerLiteral(10), KwS
+  KwS,
 };
+
 struct Token {
   TokenType type = TokenType::EndOfFile;
   std::string lexeme;
   int line = 1;
   int column = 1;
 };
+
 std::string TokenTypeToString(TokenType type);
 
 } // namespace flux

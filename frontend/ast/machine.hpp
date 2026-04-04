@@ -17,6 +17,13 @@ struct EventDecl {
   std::vector<Param> params;
 };
 
+//全局变量声明
+struct VarDecl {
+    ValueType type;
+    std::string name;
+    std::unique_ptr<Expr> initializer;  // 可选，nullptr 表示无初始值
+};
+
 // 定义after后面跟的时间
 struct DurationLiteral {
   int64_t duration = 0;
@@ -67,6 +74,8 @@ struct MachineDecl {
   std::vector<EventDecl> events;
   // 所有transition语句
   std::vector<TransitionDecl> transitions;
+  // machine内的全局变量
+  std::vector<VarDecl> vars; 
 };
 
 struct Program {
