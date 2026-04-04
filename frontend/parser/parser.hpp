@@ -11,10 +11,10 @@ namespace flux {
 class Parser {
 public:
   explicit Parser(std::vector<Token> tokens);
-
-private:
   // 整个Program
   Program ParseProgram();
+
+private:
   // for machine,名字可以直接消费掉
   MachineDecl ParseMachineDecl();
   std::vector<std::string> ParseStateDecl(MachineDecl &machine);

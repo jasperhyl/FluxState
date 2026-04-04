@@ -11,7 +11,7 @@ namespace {
 const std::unordered_map<std::string, TokenType> KeywordMap = {
     {"machine", TokenType::KwMachine},
     {"state", TokenType::KwState},
-  {"initial", TokenType::KwInitial},
+    {"initial", TokenType::KwInitial},
     {"event", TokenType::KwEvent},
     {"transition", TokenType::KwTransition},
     {"guard", TokenType::KwGuard},
@@ -109,7 +109,7 @@ std::vector<Token> Lexer::Tokenize() {
       if (Match('=')) {
         tokens.push_back(MakeToken(TokenType::BangEqual, "!=", token_line, token_col));
       } else {
-        tokens.push_back(MakeToken(TokenType::Bang, "!", token_line, token_col));
+        throw std::runtime_error(BuildError("暂时不支持!", _line, _column));
       }
       break;
     case '=':
@@ -137,14 +137,14 @@ std::vector<Token> Lexer::Tokenize() {
       if (Match('&')) {
         tokens.push_back(MakeToken(TokenType::AndAnd, "&&", token_line, token_col));
       } else {
-        tokens.push_back(MakeToken(TokenType::BitAnd, "&", token_line, token_col));
+        tokens.push_back(MakeToken(TokenType::Ampersand, "&", token_line, token_col));
       }
       break;
     case '|':
       if (Match('|')) {
         tokens.push_back(MakeToken(TokenType::OrOr, "||", token_line, token_col));
       } else {
-        tokens.push_back(MakeToken(TokenType::BitOr, "|", token_line, token_col));
+        tokens.push_back(MakeToken(TokenType::Pipe, "|", token_line, token_col));
       }
       break;
     case '"':

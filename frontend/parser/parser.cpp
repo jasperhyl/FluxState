@@ -192,6 +192,8 @@ std::unique_ptr<Expr> Parser::ParseAssign() {
     auto node = std::make_unique<AssignExpr>();
     node->lhs = std::move(lhs);
     node->rhs = std::move(rhs);
+
+    lhs = std::move(node);
   }
   return lhs;
 }
@@ -341,6 +343,7 @@ std::unique_ptr<Expr> Parser::ParseUnary() {
     auto expr = std::make_unique<UnaryExpr>();
     expr->op = ParseUnaryOp(token.type);
     expr->operand = std::move(operand);
+    return expr;
   }
   return ParsePrimary();
 }
