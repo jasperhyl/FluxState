@@ -252,10 +252,9 @@ std::unique_ptr<ExprStmt> Parser::ParseExprStmt() {
 
 std::unique_ptr<Stmt> Parser::ParseEmit() {
     Consume(TokenType::KwEmit, "expect keyword emit");
+    Consume(TokenType::LParen, "expect '(' after 'emit'");
     auto stmt = std::make_unique<EmitStmt>();
-    auto target = std::make_unique<VarExpr>();
-    target->name = Consume(TokenType::Identifier, "expect emit target").lexeme;
-    stmt->target = std::move(target);
+    stmt->target = ParseExpr();
     Consume(TokenType::Comma, "expect ',' after target");
     stmt->invoke = ParseEventInvoke();
     Consume(TokenType::RParen, "expect ')' after emit arguments");

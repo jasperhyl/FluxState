@@ -2,6 +2,7 @@
 namespace flux {
 enum class ValueType {
   Invalid, // 语义错误占位
+  MachineRef,
   Bool,
   Char,
   Short,

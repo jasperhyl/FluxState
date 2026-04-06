@@ -1,72 +1,116 @@
 ﻿// main.cpp
-#include <iostream>
+#include "../backend/irgen/irgen.hpp"
+#include "../backend/lowering/lowering.hpp"
+#include "lexer/lexer.hpp"
+#include "parser/parser.hpp"
+#include "sema/diagnostics.hpp"
+#include "sema/sema.hpp"
 #include <fstream>
+#include <iostream>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Verifier.h>
+#include <llvm/Support/raw_ostream.h>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
-#include "lexer/lexer.hpp"
-#include "parser.hpp"
 
 using namespace flux;
 
-int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <source_file.flux>" << std::endl;
-        return 1;
-    }
+namespace {
 
-    // 读取源文件
-    std::ifstream file(argv[1]);
-    if (!file.is_open()) {
-        std::cerr << "Error: cannot open file " << argv[1] << std::endl;
-        return 1;
-    }
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string source = buffer.str();
+std::string ReadSourceFile(const char *path) {
+  std::ifstream file(path);
+  if (!file.is_open()) {
+    throw std::runtime_error("cannot open file: " + std::string(path));
+  }
 
-    // 词法分析
-    Lexer lexer(source);
-    std::vector<Token> tokens;
-    try {
-        tokens = lexer.Tokenize();
-    } catch (const std::runtime_error& e) {
-        std::cerr << "Lexical error: " << e.what() << std::endl;
-        return 1;
-    }
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  return buffer.str();
+}
 
-    // 可选：打印 tokens（调试用）
-    std::cout << "Tokens:" << std::endl;
-    for (const auto& tok : tokens) {
-        std::cout << "  " << TokenTypeToString(tok.type) << " \"" << tok.lexeme << "\" at "
-                  << tok.line << ":" << tok.column << std::endl;
-    }
+void PrintSemaDiagnostics(const std::vector<Diagnostic> &diagnostics) {
+  for (const auto &diagnostic : diagnostics) {
+    const char *level = diagnostic.level == Diagnostic::Level::Error ? "error" : "warning";
+    std::cerr << "sema " << level << ": " << diagnostic.msg << '\n';
+  }
+}
 
-    // 语法分析
+void PrintStringDiagnostics(const char *stage, const std::vector<std::string> &diagnostics) {
+  for (const auto &diagnostic : diagnostics) {
+    std::cerr << stage << " error: " << diagnostic << '\n';
+  }
+}
+
+} // namespace
+
+int main(int argc, char *argv[]) {
+  if (argc != 2) {
+    std::cerr << "Usage: " << argv[0] << " <source_file.fs>\n";
+    return 1;
+  }
+
+  std::string source;
+  try {
+    source = ReadSourceFile(argv[1]);
+  } catch (const std::runtime_error &error) {
+    std::cerr << "io error: " << error.what() << '\n';
+    return 1;
+  }
+
+  std::vector<Token> tokens;
+  try {
+    Lexer lexer(std::move(source));
+    tokens = lexer.Tokenize();
+  } catch (const std::runtime_error &error) {
+    std::cerr << "lex error: " << error.what() << '\n';
+    return 1;
+  }
+
+  Program program;
+  try {
     Parser parser(std::move(tokens));
-    try {
-        Program program = parser.ParseProgram();
-        std::cout << "\nParsing succeeded. Found " << program.machines.size() << " machine(s)." << std::endl;
-        for (const auto& m : program.machines) {
-            std::cout << "Machine: " << m.name << std::endl;
-            std::cout << "  States: ";
-            for (const auto& s : m.states) std::cout << s << " ";
-            std::cout << "\n  Initial state: " << m.initial_state << std::endl;
-            std::cout << "  Events: ";
-            for (const auto& e : m.events) {
-                std::cout << e.name << "(";
-                for (size_t i = 0; i < e.params.size(); ++i) {
-                    if (i > 0) std::cout << ",";
-                    std::cout << ParamTypeToString(e.params[i].type) << " " << e.params[i].name;
-                }
-                std::cout << ") ";
-            }
-            std::cout << "\n  Transitions: " << m.transitions.size() << std::endl;
-        }
-    } catch (const std::runtime_error& e) {
-        std::cerr << "Parse error: " << e.what() << std::endl;
-        return 1;
-    }
+    program = parser.ParseProgram();
+  } catch (const std::runtime_error &error) {
+    std::cerr << "parse error: " << error.what() << '\n';
+    return 1;
+  }
 
-    return 0;
+  Sema sema;
+  SemaResult sema_result = sema.Analyze(program);
+  if (!sema_result.Ok()) {
+    PrintSemaDiagnostics(sema_result.diagnostics);
+    return 1;
+  }
+
+  Lowering lowering;
+  LoweringResult lowering_result = lowering.Lower(program, sema_result.semantic_model);
+  if (!lowering_result.Ok()) {
+    PrintStringDiagnostics("lowering", lowering_result.diagnostics);
+    return 1;
+  }
+
+  IRGen irgen;
+  IRGenResult irgen_result = irgen.Generate(lowering_result.program, argv[1]);
+  if (!irgen_result.Ok()) {
+    PrintStringDiagnostics("irgen", irgen_result.diagnostics);
+    return 1;
+  }
+  if (!irgen_result.module) {
+    std::cerr << "irgen error: generated module is null\n";
+    return 1;
+  }
+
+  std::string verify_error;
+  llvm::raw_string_ostream verify_stream(verify_error);
+  if (llvm::verifyModule(*irgen_result.module, &verify_stream)) {
+    verify_stream.flush();
+    std::cerr << "llvm verify error:\n" << verify_error;
+    return 1;
+  }
+
+  irgen_result.module->print(llvm::outs(), nullptr);
+  llvm::outs().flush();
+  return 0;
 }
