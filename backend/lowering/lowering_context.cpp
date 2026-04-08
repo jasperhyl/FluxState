@@ -22,6 +22,8 @@ void LoweringContext::EnterMachine(const MachineDecl &machine) {
   PushScope();
 }
 
+// 这里是整个machine lowering结束了
+//  所以直接把_scope_stack清空就好了，不用pop
 void LoweringContext::LeaveMachine() {
   _current_machine = nullptr;
   _scope_stack.clear();
@@ -32,6 +34,9 @@ void LoweringContext::LeaveMachine() {
 
 const MachineDecl *LoweringContext::CurrentMachine() const { return _current_machine; }
 
+// 创建一个空作用域并压栈
+// 即_scope_stack.push_back(std::unordered_map<std::string, LoweredSymbolRef>{});
+// 后续由BindSymbol进行填充
 void LoweringContext::PushScope() { _scope_stack.emplace_back(); }
 
 void LoweringContext::PopScope() {

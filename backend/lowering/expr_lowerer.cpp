@@ -5,6 +5,7 @@ namespace flux {
 ExprLowerer::ExprLowerer(LoweringContext &ctx) : _ctx(ctx) {}
 
 std::unique_ptr<LoweredExpr> ExprLowerer::LowerExpr(const Expr &expr) {
+  // 尝试把静态基类expr动态转化为BoolLiteralExpr，如果可以转化就调用对应函数lowering，如果不能就返回nullptr
   if (const auto *node = dynamic_cast<const BoolLiteralExpr *>(&expr)) {
     return LowerBoolLiteral(*node);
   }

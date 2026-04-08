@@ -20,6 +20,7 @@ private:
   std::unique_ptr<LoweredExpr> LowerBinary(const BinaryExpr &expr);
   std::unique_ptr<LoweredExpr> LowerCall(const CallExpr &expr);
   std::unique_ptr<LoweredExpr> LowerAssign(const AssignExpr &expr);
+  // 去前端查这个表达式的类型，把查到而ValueType转化为LoweredType,填进对应的LoweredExpr.type
   LoweredType ResolveType(const Expr &expr) const;
 
 private:

@@ -10,6 +10,8 @@ public:
   StmtLowerer(LoweringContext &ctx, ExprLowerer &expr_lowerer);
 
   std::unique_ptr<LoweredStmt> LowerStmt(const Stmt &stmt);
+  // 如果拿到的是一个block,可以直接交给他处理，不通过LowerStmt进行分发了（半公开接口）
+  // TODO:后面再考虑要不要取消掉这个的公开吧
   std::unique_ptr<LoweredStmt> LowerBlock(const BlockStmt &stmt);
 
 private:

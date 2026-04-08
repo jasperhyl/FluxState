@@ -3,6 +3,9 @@
 namespace flux {
 namespace {
 
+// 找event的编号
+// 如果是emit到当前machine，那直接用_ctx.LookupEventTag(...)
+// 如果是emit到其他machine，那就需要到其他machine的事件声明列表里面去找，即利用本函数
 int32_t FindDeclaredEventTag(const MachineDecl &machine, const std::string &event_name) {
   for (size_t i = 0; i < machine.events.size(); ++i) {
     if (machine.events[i].name == event_name) {

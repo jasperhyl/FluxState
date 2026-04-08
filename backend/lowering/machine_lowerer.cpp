@@ -66,6 +66,7 @@ void MachineLowerer::LowerEvents(const MachineDecl &machine, LoweredMachine &low
       });
     }
     lowered_machine.events.push_back(std::move(lowered_event));
+    // 存进当前machine的ctx的目的是辅助索引,用于machien内部，不是全局的
     _ctx.RegisterEventTag(machine.events[i].name, static_cast<int32_t>(i));
   }
 }
@@ -118,14 +119,17 @@ LoweredTransition MachineLowerer::LowerTransition(const TransitionDecl &transiti
 
   _ctx.PushScope();
 
+  // 判断 transition.trigger 这个 std::variant 当前装的是不是 OnEventTrigger
   if (const auto *trigger = std::get_if<OnEventTrigger>(&transition.trigger)) {
     lowered_transition.trigger_kind = LoweredTriggerKind::OnEvent;
     if (const auto *event = _ctx.Semantic().FindOnEventResolution(*trigger)) {
+      // 把trigger_id设置为对应的event的tag,这样同一个事件不同参数触发不同的trigger，会导致trigger的id重复，但是没关系
+      // 因为trigger不是由trigger_id唯一标识的。这里trigger_id只是用来表示他监听了哪个事件
       lowered_transition.trigger_id = _ctx.LookupEventTag(event->name);
       for (size_t i = 0; i < trigger->bindings.size() && i < event->params.size(); ++i) {
         LoweredSymbolRef symbol;
-        symbol.name = trigger->bindings[i];
-        symbol.type = LoweredTypeFromValueType(event->params[i].type);
+        symbol.name = trigger->bindings[i];                            // 取出事件绑定的变量
+        symbol.type = LoweredTypeFromValueType(event->params[i].type); // 取出对应变量的类型
         symbol.storage = LoweredStorageKind::TriggerValue;
         symbol.index = i;
         symbol.semantic_symbol = ResolvedSymbol{
@@ -145,13 +149,15 @@ LoweredTransition MachineLowerer::LowerTransition(const TransitionDecl &transiti
     }
   } else if (const auto *trigger = std::get_if<AfterTrigger>(&transition.trigger)) {
     lowered_transition.trigger_kind = LoweredTriggerKind::After;
+    // 为 after trigger 额外造一个“超时事件”，所以事件编号就是已有事件声明的最后一个
     const auto timeout_event_tag = static_cast<int32_t>(lowered_machine.events.size());
-    std::string timeout_event_name;
+    std::string timeout_event_name; // 给超时事件取一个名字
     if (const auto *machine = _ctx.CurrentMachine()) {
       timeout_event_name = "__timeout_" + machine->name + "_" + transition.src_state + "_" + std::to_string(index);
     } else {
       timeout_event_name = "__timeout_" + std::to_string(index);
     }
+    // 用LowerAfterTimer构造一个超时事件
     lowered_transition.timer = LowerAfterTimer(transition, *trigger, timeout_event_tag, timeout_event_name);
     if (lowered_transition.timer.has_value()) {
       lowered_transition.trigger_id = lowered_transition.timer->timeout_event_tag;

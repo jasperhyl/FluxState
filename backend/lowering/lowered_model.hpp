@@ -11,6 +11,7 @@
 
 namespace flux {
 
+// 后端类型系统
 enum class LoweredTypeKind {
   Invalid,
   Void,
@@ -28,11 +29,15 @@ enum class LoweredTypeKind {
 
 struct LoweredType {
   LoweredTypeKind kind = LoweredTypeKind::Invalid;
-  std::string pointee_name;
+  std::string pointee_name; // 这个指针指向的对象名字,比如machine name,可以用于报错等
 };
 
+// LoweredField { name = "x", type = Int }
 struct LoweredField {
   std::string name;
+  // 这里有一个问题，为什么不直接存
+  // LoweredTypeKind kind = LoweredTypeKind::Invalid;
+  // 因为LoweredType以后还可以增加数组长度等字段
   LoweredType type;
 };
 
@@ -45,6 +50,7 @@ struct LoweredEvent {
   std::string name;
   int32_t tag = -1;
   bool is_timeout = false;
+  // 收集event的参数信息
   std::vector<LoweredField> params;
 };
 
@@ -56,6 +62,42 @@ struct LoweredTimerSpec {
   std::string timeout_event_name;
 };
 
+// 标记不同的值来源
+// 比如machine名字会被标记为MachineSymbol,表示这个名字不是普通变量，而是一个machine引用
+// 比如machine 变量 lowering 时会标记成环境字段
+// 因为lowering之后是用局部index标记变量的
+// 如果不知道变量对应的存储类型，那么就会出现两个编号相同的不同变量
+/*
+ machine Counter {
+  int count;
+
+  event Add(int x);
+
+  Idle -> Idle on Add(x) {
+    count = count + x;
+  }
+}
+lowing之后
+count -> {
+  name = "count",
+  type = Int,
+  storage = EnvField,
+  index = 0
+}
+
+x -> {
+  name = "x",
+  type = Int,
+  storage = TriggerValue,
+  index = 0
+}
+取count:load machine.env[0]
+取x:load trigger.args[0]
+如果没有LoweredStorageKind，就会出现：
+count -> { name = "count", type = Int, index = 0 }
+x     -> { name = "x", type = Int, index = 0 }
+那就不知道去哪里取了
+*/
 enum class LoweredStorageKind {
   None,
   MachineSymbol,
@@ -68,9 +110,10 @@ struct LoweredSymbolRef {
   LoweredType type;
   LoweredStorageKind storage = LoweredStorageKind::None;
   size_t index = 0;
-  ResolvedSymbol semantic_symbol;
+  ResolvedSymbol semantic_symbol; // 保留语义来源，但现在并没有被真正使用
 };
 
+// 标记expr节点的种类，这样才知道要怎么解释对应而expr节点
 enum class LoweredExprKind {
   BoolLiteral,
   CharLiteral,
@@ -83,10 +126,11 @@ enum class LoweredExprKind {
   Assign,
 };
 
+// 对于不同的LoweredExprKind，有些字段不会被设置
 struct LoweredExpr {
   LoweredExprKind kind = LoweredExprKind::IntLiteral;
   LoweredType type;
-  const Expr *source = nullptr;
+  const Expr *source = nullptr; // 标记是从哪个ast节点lowering下来的
 
   bool bool_value = false;
   uint32_t char_value = 0;
@@ -142,7 +186,9 @@ struct LoweredTransition {
 };
 
 struct LoweredEnvLayout {
+  // 存machine的非业务变量的声明
   std::vector<LoweredField> fields;
+  // 每个字段对应的初始化表达式（没有初始化，这里就会为空）
   std::vector<std::unique_ptr<LoweredExpr>> initializers;
 };
 

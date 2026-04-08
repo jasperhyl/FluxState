@@ -8,6 +8,7 @@
 //      emit(TargetMachine, Event(...));
 // 4. 当前版本已经支持使用 machine 名称作为 emit target，
 //    因此本文件同时覆盖同机 emit 与跨 machine emit。
+// 5. 当前不支持块内变量定义，只能在machine级别定义
 
 machine SyntaxCoverage {
     state Idle, Armed, Waiting, Cooling, Error;
