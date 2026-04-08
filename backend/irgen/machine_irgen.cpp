@@ -15,10 +15,12 @@
 namespace flux {
 namespace {
 
+// index是machine.transitions对应的索引
 std::string GuardName(const LoweredMachine &machine, size_t index) {
   return "fs_guard_" + machine.name + "_" + std::to_string(index);
 }
 
+// 这里的index也是
 std::string ActionName(const LoweredMachine &machine, size_t index) {
   return "fs_action_" + machine.name + "_" + std::to_string(index);
 }
@@ -29,6 +31,7 @@ std::string DispatchName(const LoweredMachine &machine) { return "fs_dispatch_" 
 
 std::string GlobalMachineName(const LoweredMachine &machine) { return "fs_machine_" + machine.name; }
 
+// 时间单位转换
 int64_t ToNanoseconds(const LoweredTimerSpec &timer) {
   switch (timer.unit) {
   case DurationLiteral::Unit::MilliSeconds:
@@ -42,12 +45,15 @@ int64_t ToNanoseconds(const LoweredTimerSpec &timer) {
 }
 
 llvm::Value *NormalizeBool(IRGenContext &ctx, llvm::Value *value) {
+  // 如果这个值本来就已经是 i1，也就是 LLVM 里的标准布尔类型,那就直接返回
   if (value->getType()->isIntegerTy(1)) {
     return value;
   }
+  // 如果不是i1，但仍然是整数类型，就生成一个不等于0的比较
   if (value->getType()->isIntegerTy()) {
     return ctx.Builder().CreateICmpNE(value, llvm::ConstantInt::get(value->getType(), 0));
   }
+  // 否则原样返回
   return value;
 }
 
@@ -61,9 +67,9 @@ void MachineIRGen::PrepareMachine(const LoweredMachine &machine) {
   auto *global = new llvm::GlobalVariable(_ctx.Module(), layout.machine_type, false, llvm::GlobalValue::InternalLinkage,
                                           BuildMachineInitializer(machine, layout), GlobalMachineName(machine));
   _ctx.RegisterMachineInstance(machine.name, MachineInstanceIRInfo{
-                                                .layout = std::move(layout),
-                                                .global = global,
-                                            });
+                                                 .layout = std::move(layout),
+                                                 .global = global,
+                                             });
 }
 
 void MachineIRGen::EmitMachine(const LoweredMachine &machine) {
@@ -109,21 +115,21 @@ MachineIRLayout MachineIRGen::BuildLayout(const LoweredMachine &machine) {
 llvm::Constant *MachineIRGen::BuildMachineInitializer(const LoweredMachine &machine, const MachineIRLayout &layout) {
   auto &llvm_ctx = _ctx.LLVM();
   llvm::Constant *header_init = llvm::ConstantStruct::get(
-      layout.header_type,
-      {
-          llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvm_ctx), machine.initial_state_tag),
-          llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvm_ctx), 0),
-          llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), 0),
-          llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm_ctx, 0)),
-          llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm_ctx, 0)),
-          llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm_ctx, 0)),
-      });
+      layout.header_type, {
+                              llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvm_ctx), machine.initial_state_tag),
+                              llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvm_ctx), 0),
+                              llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), 0),
+                              llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm_ctx, 0)),
+                              llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm_ctx, 0)),
+                              llvm::ConstantPointerNull::get(llvm::PointerType::get(llvm_ctx, 0)),
+                          });
 
   llvm::Constant *env_init = llvm::ConstantAggregateZero::get(layout.env_type);
   return llvm::ConstantStruct::get(layout.machine_type, {header_init, env_init});
 }
 
-void MachineIRGen::EmitInitFunction(const LoweredMachine &machine, const MachineIRLayout &layout, llvm::GlobalVariable *global) {
+void MachineIRGen::EmitInitFunction(const LoweredMachine &machine, const MachineIRLayout &layout,
+                                    llvm::GlobalVariable *global) {
   auto *function = llvm::Function::Create(llvm::FunctionType::get(llvm::Type::getVoidTy(_ctx.LLVM()), false),
                                           llvm::Function::ExternalLinkage, InitName(machine), _ctx.Module());
   auto *entry = llvm::BasicBlock::Create(_ctx.LLVM(), "entry", function);
@@ -150,7 +156,8 @@ void MachineIRGen::EmitInitFunction(const LoweredMachine &machine, const Machine
     if (!machine.env.initializers[i]) {
       continue;
     }
-    llvm::Value *field_ptr = _ctx.Builder().CreateStructGEP(layout.env_type, env_ptr, i, machine.env.fields[i].name + ".init");
+    llvm::Value *field_ptr =
+        _ctx.Builder().CreateStructGEP(layout.env_type, env_ptr, i, machine.env.fields[i].name + ".init");
     llvm::Value *value = _expr_irgen.EmitExpr(*machine.env.initializers[i]);
     _ctx.Builder().CreateStore(
         AdjustForStore(_ctx, _types, machine.env.fields[i].type, machine.env.initializers[i]->type, value), field_ptr);
@@ -165,9 +172,11 @@ void MachineIRGen::EmitInitFunction(const LoweredMachine &machine, const Machine
 }
 
 void MachineIRGen::EmitGuardFunctions(const LoweredMachine &machine, const MachineIRLayout &layout) {
-  auto *function_type = llvm::FunctionType::get(
-      llvm::Type::getInt1Ty(_ctx.LLVM()), {llvm::PointerType::get(_ctx.LLVM(), 0), llvm::PointerType::get(_ctx.LLVM(), 0)},
-      false);
+  // i1是指bool
+  // llvm::FunctionType::get(返回类型, 参数类型列表, 是否可变参数)
+  auto *function_type =
+      llvm::FunctionType::get(llvm::Type::getInt1Ty(_ctx.LLVM()),
+                              {llvm::PointerType::get(_ctx.LLVM(), 0), llvm::PointerType::get(_ctx.LLVM(), 0)}, false);
 
   for (size_t i = 0; i < machine.transitions.size(); ++i) {
     const auto &transition = machine.transitions[i];
@@ -192,9 +201,9 @@ void MachineIRGen::EmitGuardFunctions(const LoweredMachine &machine, const Machi
 }
 
 void MachineIRGen::EmitActionFunctions(const LoweredMachine &machine, const MachineIRLayout &layout) {
-  auto *function_type = llvm::FunctionType::get(
-      llvm::Type::getVoidTy(_ctx.LLVM()), {llvm::PointerType::get(_ctx.LLVM(), 0), llvm::PointerType::get(_ctx.LLVM(), 0)},
-      false);
+  auto *function_type =
+      llvm::FunctionType::get(llvm::Type::getVoidTy(_ctx.LLVM()),
+                              {llvm::PointerType::get(_ctx.LLVM(), 0), llvm::PointerType::get(_ctx.LLVM(), 0)}, false);
 
   for (size_t i = 0; i < machine.transitions.size(); ++i) {
     const auto &transition = machine.transitions[i];
@@ -212,16 +221,51 @@ void MachineIRGen::EmitActionFunctions(const LoweredMachine &machine, const Mach
     _ctx.SetCurrentMachineLayout(layout);
     _ctx.PushValueScope();
     BindTransitionPayload(transition, layout, function);
-    _stmt_irgen.EmitStmt(*transition.action);
+    _stmt_irgen.EmitStmt(*transition.action); // 这个是关键
     _ctx.Builder().CreateRetVoid();
     _ctx.PopValueScope();
   }
 }
 
+// 为某个machine生成它的“事件分发函数”
+// 也就是运行时收到一个事件后，如何根据：当前状态 current_state,当前事件 event.tag,各条 transition 的 guard,来决定走哪条
+// transition，并执行对应迁移。
+/*
+void dispatch(machine, event) {
+  switch (machine.current_state) {
+    case StateA:
+      switch (event.tag) {
+        case Event1:
+          if (guard1(machine, event)) {
+            execute_transition_1(machine, event);
+            return;
+          }
+          if (guard2(machine, event)) {
+            execute_transition_2(machine, event);
+            return;
+          }
+          return;
+      }
+      return;
+
+    case StateB:
+      ...
+  }
+
+  return;
+}
+先看当前处于哪个状态
+再看当前事件是什么
+找到这个状态下、由这个事件触发的所有 transition
+按顺序检查 guard
+命中一条就执行 transition 并返回
+都不命中就直接返回
+*/
 void MachineIRGen::EmitDispatchFunction(const LoweredMachine &machine, const MachineIRLayout &layout) {
-  auto *function_type = llvm::FunctionType::get(
-      llvm::Type::getVoidTy(_ctx.LLVM()), {llvm::PointerType::get(_ctx.LLVM(), 0), llvm::PointerType::get(_ctx.LLVM(), 0)},
-      false);
+  // 生成void fs_dispatch_xxx(void* machine, void* event)
+  auto *function_type =
+      llvm::FunctionType::get(llvm::Type::getVoidTy(_ctx.LLVM()),
+                              {llvm::PointerType::get(_ctx.LLVM(), 0), llvm::PointerType::get(_ctx.LLVM(), 0)}, false);
   llvm::Function *function =
       llvm::Function::Create(function_type, llvm::Function::ExternalLinkage, DispatchName(machine), _ctx.Module());
 
@@ -244,8 +288,7 @@ void MachineIRGen::EmitDispatchFunction(const LoweredMachine &machine, const Mac
   llvm::SwitchInst *state_switch = _ctx.Builder().CreateSwitch(current_state, return_block, machine.states.size());
 
   for (const auto &state : machine.states) {
-    llvm::BasicBlock *state_block =
-        llvm::BasicBlock::Create(_ctx.LLVM(), "state." + state.name, function);
+    llvm::BasicBlock *state_block = llvm::BasicBlock::Create(_ctx.LLVM(), "state." + state.name, function);
     state_switch->addCase(llvm::ConstantInt::get(llvm::Type::getInt32Ty(_ctx.LLVM()), state.tag), state_block);
 
     std::vector<size_t> state_transitions;
@@ -315,14 +358,18 @@ void MachineIRGen::BindTransitionPayload(const LoweredTransition &transition, co
     return;
   }
 
-  llvm::Value *event_arg = function->getArg(1);
+  llvm::Value *event_arg = function->getArg(1); // 第二个参数，也就是event
+  // 就是FS_Event的void* payload,但是是void**。event_arg其实就是FS_Event*
   llvm::Value *payload_ptr = _ctx.Builder().CreateStructGEP(_types.GetEventType(), event_arg, 4, "event.payload.addr");
+  // payload_value = event->payload;真正拿到payload指针
   llvm::Value *payload_value =
       _ctx.Builder().CreateLoad(llvm::PointerType::get(_ctx.LLVM(), 0), payload_ptr, "event.payload");
+  // 把 payload_value 变成一个后续方便继续做字段访问的指针值。typed_payload = (SomePayloadStruct*) event->payload;
   llvm::Value *typed_payload =
       _ctx.Builder().CreateBitCast(payload_value, llvm::PointerType::get(_ctx.LLVM(), 0), "typed.payload");
 
   for (const auto &binding : transition.bindings) {
+    // 告诉payload_it->second，即struct具体的type，才能正确解释type_payload
     llvm::Value *field_ptr = _ctx.Builder().CreateStructGEP(payload_it->second, typed_payload, binding.index);
     llvm::Value *loaded = _ctx.Builder().CreateLoad(_types.ToIRType(binding.type, true), field_ptr, binding.name);
     if (binding.type.kind == LoweredTypeKind::Bool && loaded->getType()->isIntegerTy(8)) {
@@ -332,11 +379,14 @@ void MachineIRGen::BindTransitionPayload(const LoweredTransition &transition, co
   }
 }
 
+// 某一条 transition 被选中之后，真正执行这次状态迁移本身。
 void MachineIRGen::EmitExecuteTransition(const LoweredMachine &machine, const MachineIRLayout &layout,
                                          const LoweredTransition &transition, size_t transition_index) {
   llvm::Value *machine_value = _ctx.CurrentMachineValue();
   llvm::Value *event_value = _ctx.CurrentEventValue();
+  // 等价auto *header_ptr = &machine->hdr;
   llvm::Value *header_ptr = _ctx.Builder().CreateStructGEP(layout.machine_type, machine_value, 0, "hdr");
+  // 等价auto *state_ptr = &machine->hdr.current_state;
   llvm::Value *state_ptr = _ctx.Builder().CreateStructGEP(layout.header_type, header_ptr, 0, "state.addr");
 
   if (transition.action) {
@@ -344,14 +394,22 @@ void MachineIRGen::EmitExecuteTransition(const LoweredMachine &machine, const Ma
     _ctx.Builder().CreateCall(action_function, {machine_value, event_value});
   }
 
+  // 准备离开 src_state，那么这个状态下挂着的 after / timeout 定时器应该取消掉
   EmitCancelTimersForState(machine, transition.src_state_tag, header_ptr);
+  // 把当前状态写成目标状态
+  // CreateStore(要写入的值，写入的目标地址)
   _ctx.Builder().CreateStore(llvm::ConstantInt::get(llvm::Type::getInt32Ty(_ctx.LLVM()), transition.dst_state_tag),
                              state_ptr);
+  // 启动新状态相关 timer
   EmitStartTimersForState(machine, transition.dst_state_tag, header_ptr);
 }
 
-void MachineIRGen::EmitStartTimersForState(const LoweredMachine &machine, int32_t state_tag, llvm::Value *machine_header_ptr) {
+// 生成一条对 runtime 函数 fs_start_timer(...) 的调用 IR。
+// 真正启动 timer 的动作发生在运行时，也就是 runtime/runtime.c 里的 fs_start_timer。
+void MachineIRGen::EmitStartTimersForState(const LoweredMachine &machine, int32_t state_tag,
+                                           llvm::Value *machine_header_ptr) {
   for (const auto &transition : machine.transitions) {
+    // 找出当前这个 state 下、由 after 触发、并且带 timer 配置”的 transition
     if (transition.trigger_kind != LoweredTriggerKind::After || transition.src_state_tag != state_tag ||
         !transition.timer.has_value()) {
       continue;
@@ -360,9 +418,12 @@ void MachineIRGen::EmitStartTimersForState(const LoweredMachine &machine, int32_
     const auto delay_ns = ToNanoseconds(*transition.timer);
     const auto retry_ns =
         transition.timer->retry.has_value() ? transition.timer->retry.value() * 1000LL * 1000LL * 1000LL : 0LL;
+    // 在 LLVM IR 里插入一条函数调用指令
+    // 调用的是runtime.c的fs_start_timer函数
     _ctx.Builder().CreateCall(
         _ctx.Runtime().start_timer,
-        {machine_header_ptr, llvm::ConstantInt::get(llvm::Type::getInt32Ty(_ctx.LLVM()), transition.timer->timeout_event_tag),
+        {machine_header_ptr,
+         llvm::ConstantInt::get(llvm::Type::getInt32Ty(_ctx.LLVM()), transition.timer->timeout_event_tag),
          llvm::ConstantInt::get(llvm::Type::getInt64Ty(_ctx.LLVM()), delay_ns),
          llvm::ConstantInt::get(llvm::Type::getInt64Ty(_ctx.LLVM()), retry_ns)});
   }
@@ -376,9 +437,9 @@ void MachineIRGen::EmitCancelTimersForState(const LoweredMachine &machine, int32
       continue;
     }
 
-    _ctx.Builder().CreateCall(
-        _ctx.Runtime().cancel_timer,
-        {machine_header_ptr, llvm::ConstantInt::get(llvm::Type::getInt32Ty(_ctx.LLVM()), transition.timer->timeout_event_tag)});
+    _ctx.Builder().CreateCall(_ctx.Runtime().cancel_timer,
+                              {machine_header_ptr, llvm::ConstantInt::get(llvm::Type::getInt32Ty(_ctx.LLVM()),
+                                                                          transition.timer->timeout_event_tag)});
   }
 }
 

@@ -5,7 +5,7 @@
 namespace llvm {
 class Type;
 class StructType;
-}
+} // namespace llvm
 
 namespace flux {
 
@@ -25,7 +25,7 @@ private:
   IRGenContext &_ctx;
   llvm::StructType *_string_type = nullptr;
   llvm::StructType *_event_type = nullptr;
-  llvm::StructType *_machine_header_type = nullptr;
+  llvm::StructType *_machine_header_type = nullptr; // 这个是动态构造出来的
 };
 
 } // namespace flux

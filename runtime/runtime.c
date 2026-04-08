@@ -9,17 +9,22 @@
 #include <time.h>
 
 enum {
-  FS_EVENT_QUEUE_INITIAL_CAP = 16u,
-  FS_TIMER_TABLE_INITIAL_CAP = 8u,
+  FS_EVENT_QUEUE_INITIAL_CAP = 16u, // 初始事件队列分配能放16个事件指针的空间。
+  FS_TIMER_TABLE_INITIAL_CAP = 8u,  // 定时器表刚创建出来时，先分配能放8个定时器的空间。
 };
 
+// 如果当前没有事件可处理，也没有即将到期的 timer，那 runtime 不要空转死循环，先 sleep 1ms，再继续下一轮
 static const uint64_t FS_IDLE_SLEEP_NS = 1000ULL * 1000ULL;
 
-static void fs_fatal_oom(void) {
+// 当 runtime 内存分配失败时，立刻打印错误并终止程序。
+static void fs_fatal_oom(void) { // out of memory
+  // 在标准错误输出
   fputs("FluxState runtime: out of memory\n", stderr);
+  // 直接异常终止进程
   abort();
 }
 
+// xcalloc带失败即退出的calloc
 static void *fs_xcalloc(size_t count, size_t size) {
   void *ptr = calloc(count, size);
   if (ptr == NULL) {
@@ -28,6 +33,7 @@ static void *fs_xcalloc(size_t count, size_t size) {
   return ptr;
 }
 
+// 把一块已有内存 ptr 重新调整到新的大小 size
 static void *fs_xrealloc(void *ptr, size_t size) {
   void *next = realloc(ptr, size);
   if (next == NULL) {
@@ -36,12 +42,14 @@ static void *fs_xrealloc(void *ptr, size_t size) {
   return next;
 }
 
+// 获取当前单调时钟时间，并把它转换成纳秒返回。
 static uint64_t fs_now_ns(void) {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
   return (uint64_t)ts.tv_sec * 1000ULL * 1000ULL * 1000ULL + (uint64_t)ts.tv_nsec;
 }
 
+//
 static void fs_sleep_ns(uint64_t ns) {
   if (ns == 0) {
     return;

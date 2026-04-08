@@ -74,12 +74,17 @@ llvm::StructType *TypeConverter::GetMachineHeaderType() {
 
   _machine_header_type = llvm::StructType::create(_ctx.LLVM(), "FS_MachineHeader");
   _machine_header_type->setBody({
-      llvm::Type::getInt32Ty(_ctx.LLVM()),
-      llvm::Type::getInt32Ty(_ctx.LLVM()),
-      llvm::Type::getInt64Ty(_ctx.LLVM()),
+      llvm::Type::getInt32Ty(_ctx.LLVM()), // i32当前状态current_state
+      llvm::Type::getInt32Ty(_ctx.LLVM()), // i32运行时标志位，FS_MACHINE_INITIALIZED或FS_MACHINE_RUNNING
+      llvm::Type::getInt64Ty(_ctx.LLVM()), // i64entered_at_ns 进入当前状态的时间戳，单位纳秒。状态发生变化时会更新。
+      // 这是ptr类型,queue 事件队列指针，类型是 FS_EventQueue *。machine 收到的事件会先进入这里。
       llvm::PointerType::getUnqual(_ctx.LLVM()),
+      // timers 定时器表指针，类型是 FS_TimerTable *。after 之类的超时触发器靠它管理。
       llvm::PointerType::getUnqual(_ctx.LLVM()),
+      // dispatch 调度函数指针，类型是 FS_DispatchFn。runtime每取到一个事件，就调用这个函数把事件交给该 machine 的
+      // dispatch 逻辑处理。
       llvm::PointerType::getUnqual(_ctx.LLVM()),
+
   });
   return _machine_header_type;
 }
