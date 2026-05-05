@@ -7,7 +7,7 @@ OUTPUT_BIN="${ROOT_DIR}/fluxstate_ir"
 
 cd "${ROOT_DIR}"
 
-clang++ -std=c++20 \
+clang++-15 \
   frontend/main.cpp \
   frontend/lexer/lexer.cpp \
   frontend/lexer/token.cpp \
@@ -33,7 +33,8 @@ clang++ -std=c++20 \
   backend/irgen/irgen.cpp \
   backend/visualizer/visualizer.cpp \
   -I. \
-  $(llvm-config --cxxflags --ldflags --libs core) \
+  $(llvm-config-15 --cxxflags --ldflags --libs core) \
+  -std=c++20 \
   -fexceptions \
   -o "${OUTPUT_BIN}"
 

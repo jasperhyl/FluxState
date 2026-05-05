@@ -80,7 +80,7 @@ std::string Visualizer::ToDot(const LoweredProgram &program) const {
 
   for (const auto &machine : program.machines) {
     oss << "digraph " << machine.name << " {\n";
-    oss << "    rankdir=LR;\n";
+    oss << "    rankdir=TB;\n";
     oss << "    node [shape=circle, style=filled, fillcolor=white, fontname=\"Arial\"];\n";
     oss << "    edge [fontname=\"Arial\", fontsize=10];\n\n";
 
@@ -121,7 +121,7 @@ std::string Visualizer::ToMermaid(const LoweredProgram &program) const {
   for (size_t mi = 0; mi < program.machines.size(); ++mi) {
     const auto &machine = program.machines[mi];
     oss << "stateDiagram-v2\n";
-    oss << "    direction LR\n\n";
+    oss << "    direction TB\n\n";
 
     // 初始状态
     std::string init_name = FindStateName(machine, machine.initial_state_tag);
