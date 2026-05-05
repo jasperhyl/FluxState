@@ -31,6 +31,7 @@ clang++ -std=c++20 \
   backend/irgen/stmt_irgen.cpp \
   backend/irgen/machine_irgen.cpp \
   backend/irgen/irgen.cpp \
+  backend/visualizer/visualizer.cpp \
   -I. \
   $(llvm-config --cxxflags --ldflags --libs core) \
   -fexceptions \

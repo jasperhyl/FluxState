@@ -1,6 +1,7 @@
 ﻿// main.cpp
 #include "../backend/irgen/irgen.hpp"
 #include "../backend/lowering/lowering.hpp"
+#include "../backend/visualizer/visualizer.hpp"
 #include "lexer/lexer.hpp"
 #include "parser/parser.hpp"
 #include "sema/diagnostics.hpp"
@@ -45,15 +46,37 @@ void PrintStringDiagnostics(const char *stage, const std::vector<std::string> &d
 
 } // namespace
 
+enum class OutputMode { IR, Dot, Mermaid };
+
 int main(int argc, char *argv[]) {
-  if (argc != 2) {
-    std::cerr << "Usage: " << argv[0] << " <source_file.fs>\n";
+  OutputMode output_mode = OutputMode::IR;
+
+  // 简单命令行解析: ./fluxstate_ir [--dot|--mermaid] <source_file.fs>
+  if (argc < 2 || argc > 3) {
+    std::cerr << "Usage: " << argv[0] << " [--dot|--mermaid] <source_file.fs>\n";
+    return 1;
+  }
+
+  const char *source_path = nullptr;
+  for (int i = 1; i < argc; ++i) {
+    std::string arg = argv[i];
+    if (arg == "--dot") {
+      output_mode = OutputMode::Dot;
+    } else if (arg == "--mermaid") {
+      output_mode = OutputMode::Mermaid;
+    } else {
+      source_path = argv[i];
+    }
+  }
+
+  if (!source_path) {
+    std::cerr << "Usage: " << argv[0] << " [--dot|--mermaid] <source_file.fs>\n";
     return 1;
   }
 
   std::string source;
   try {
-    source = ReadSourceFile(argv[1]);
+    source = ReadSourceFile(source_path);
   } catch (const std::runtime_error &error) {
     std::cerr << "io error: " << error.what() << '\n';
     return 1;
@@ -91,8 +114,20 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  // 可视化模式：在 Lowering 之后直接输出图，不需要 IRGen
+  if (output_mode == OutputMode::Dot) {
+    Visualizer viz;
+    std::cout << viz.ToDot(lowering_result.program);
+    return 0;
+  }
+  if (output_mode == OutputMode::Mermaid) {
+    Visualizer viz;
+    std::cout << viz.ToMermaid(lowering_result.program);
+    return 0;
+  }
+
   IRGen irgen;
-  IRGenResult irgen_result = irgen.Generate(lowering_result.program, argv[1]);
+  IRGenResult irgen_result = irgen.Generate(lowering_result.program, source_path);
   if (!irgen_result.Ok()) {
     PrintStringDiagnostics("irgen", irgen_result.diagnostics);
     return 1;
