@@ -1,0 +1,33 @@
+stateDiagram-v2
+    direction TB
+
+    [*] --> VehicleGreen
+
+    VehicleGreen --> VehicleYellow : on PedButton(sensor_id) [when ...]
+    VehicleYellow --> PedWalk : after 1s [when ...]
+    PedWalk --> PedFlash : after 1s
+    PedFlash --> VehicleGreen : after 1s
+    VehicleGreen --> Emergency : on EmergencyOn(code)
+    VehicleYellow --> Emergency : on EmergencyOn(code)
+    PedWalk --> Emergency : on EmergencyOn(code)
+    PedFlash --> Emergency : on EmergencyOn(code)
+    Emergency --> VehicleGreen : on EmergencyOff
+    VehicleGreen --> Maintenance : on MaintenanceOn
+    Maintenance --> VehicleGreen : on MaintenanceOff
+
+stateDiagram-v2
+    direction TB
+
+    [*] --> Cars
+
+    Cars --> Waiting : on ShowWaiting(sensor_id)
+    Waiting --> Walk : on ShowWalk(sensor_id)
+    Walk --> Flashing : on ShowFlash(sensor_id)
+    Flashing --> Cars : on ShowCars
+    Cars --> Alert : on ShowEmergency(code)
+    Waiting --> Alert : on ShowEmergency(code)
+    Walk --> Alert : on ShowEmergency(code)
+    Flashing --> Alert : on ShowEmergency(code)
+    Alert --> Cars : on ShowCars
+    Cars --> Service : on ShowMaintenance
+    Service --> Cars : on ShowCars

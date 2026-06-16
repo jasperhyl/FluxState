@@ -1,0 +1,56 @@
+digraph CrossingController {
+    rankdir=TB;
+    node [shape=circle, style=filled, fillcolor=white, fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    __initial [shape=point, width=0, style=invis];
+    __initial -> VehicleGreen [label=""];
+
+    VehicleGreen [fillcolor="#4CAF50", fontcolor=white];
+    VehicleYellow;
+    PedWalk;
+    PedFlash;
+    Emergency;
+    Maintenance;
+
+    VehicleGreen -> VehicleYellow [label="on PedButton(sensor_id) [when ...]"];
+    VehicleYellow -> PedWalk [label="after 1s [when ...]"];
+    PedWalk -> PedFlash [label="after 1s"];
+    PedFlash -> VehicleGreen [label="after 1s"];
+    VehicleGreen -> Emergency [label="on EmergencyOn(code)"];
+    VehicleYellow -> Emergency [label="on EmergencyOn(code)"];
+    PedWalk -> Emergency [label="on EmergencyOn(code)"];
+    PedFlash -> Emergency [label="on EmergencyOn(code)"];
+    Emergency -> VehicleGreen [label="on EmergencyOff"];
+    VehicleGreen -> Maintenance [label="on MaintenanceOn"];
+    Maintenance -> VehicleGreen [label="on MaintenanceOff"];
+}
+
+digraph DisplayPanel {
+    rankdir=TB;
+    node [shape=circle, style=filled, fillcolor=white, fontname="Arial"];
+    edge [fontname="Arial", fontsize=10];
+
+    __initial [shape=point, width=0, style=invis];
+    __initial -> Cars [label=""];
+
+    Cars [fillcolor="#4CAF50", fontcolor=white];
+    Waiting;
+    Walk;
+    Flashing;
+    Alert;
+    Service;
+
+    Cars -> Waiting [label="on ShowWaiting(sensor_id)"];
+    Waiting -> Walk [label="on ShowWalk(sensor_id)"];
+    Walk -> Flashing [label="on ShowFlash(sensor_id)"];
+    Flashing -> Cars [label="on ShowCars"];
+    Cars -> Alert [label="on ShowEmergency(code)"];
+    Waiting -> Alert [label="on ShowEmergency(code)"];
+    Walk -> Alert [label="on ShowEmergency(code)"];
+    Flashing -> Alert [label="on ShowEmergency(code)"];
+    Alert -> Cars [label="on ShowCars"];
+    Cars -> Service [label="on ShowMaintenance"];
+    Service -> Cars [label="on ShowCars"];
+}
+

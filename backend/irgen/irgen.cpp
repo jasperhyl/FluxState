@@ -9,7 +9,7 @@
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/Module.h>
-#include <llvm/ADT/Triple.h>
+#include <llvm/TargetParser/Triple.h>
 
 namespace flux {
 namespace {
@@ -109,7 +109,7 @@ IRGenResult IRGen::Generate(const LoweredProgram &program, const std::string &mo
   StmtIRGen stmt_irgen(ctx, types, expr_irgen);
   MachineIRGen machine_irgen(ctx, types, expr_irgen, stmt_irgen);
 
-  ctx.Module().setTargetTriple("x86_64-unknown-linux-gnu");
+  ctx.Module().setTargetTriple(llvm::Triple("x86_64-unknown-linux-gnu"));
   for (const auto &machine : program.machines) {
     machine_irgen.PrepareMachine(machine);
   }

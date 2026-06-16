@@ -5,9 +5,28 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OUTPUT_BIN="${ROOT_DIR}/fluxstate_ir"
 
+CLANGXX_BIN="${CLANGXX_BIN:-}"
+LLVM_CONFIG_BIN="${LLVM_CONFIG_BIN:-}"
+
+if [[ -z "${CLANGXX_BIN}" ]]; then
+  if command -v clang++-15 >/dev/null 2>&1; then
+    CLANGXX_BIN="clang++-15"
+  else
+    CLANGXX_BIN="clang++"
+  fi
+fi
+
+if [[ -z "${LLVM_CONFIG_BIN}" ]]; then
+  if command -v llvm-config-15 >/dev/null 2>&1; then
+    LLVM_CONFIG_BIN="llvm-config-15"
+  else
+    LLVM_CONFIG_BIN="llvm-config"
+  fi
+fi
+
 cd "${ROOT_DIR}"
 
-clang++-15 \
+"${CLANGXX_BIN}" \
   frontend/main.cpp \
   frontend/lexer/lexer.cpp \
   frontend/lexer/token.cpp \
@@ -31,9 +50,12 @@ clang++-15 \
   backend/irgen/stmt_irgen.cpp \
   backend/irgen/machine_irgen.cpp \
   backend/irgen/irgen.cpp \
+  backend/codegen/llvm_codegen.cpp \
+  backend/linker/executable_builder.cpp \
+  backend/optimizer/llvm_optimizer.cpp \
   backend/visualizer/visualizer.cpp \
   -I. \
-  $(llvm-config-15 --cxxflags --ldflags --libs core) \
+  $("${LLVM_CONFIG_BIN}" --cxxflags --ldflags --libs core passes native nativecodegen --system-libs) \
   -std=c++20 \
   -fexceptions \
   -o "${OUTPUT_BIN}"
@@ -41,3 +63,7 @@ clang++-15 \
 echo "Built ${OUTPUT_BIN}"
 echo "Generate IR with:"
 echo "  ${OUTPUT_BIN} test/test.fs > test/test.ll"
+echo "Emit object with:"
+echo "  ${OUTPUT_BIN} --emit-obj test/test.o test/test.fs"
+echo "Emit executable with:"
+echo "  ${OUTPUT_BIN} --emit-exe test/program --inject SyntaxCoverage:Ping test/test.fs"
