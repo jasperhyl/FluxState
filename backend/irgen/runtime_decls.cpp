@@ -58,6 +58,10 @@ RuntimeDecls DeclareRuntimeDecls(IRGenContext &ctx, TypeConverter &types) {
       llvm::FunctionType::get(llvm::PointerType::get(llvm_ctx, 0), {llvm::Type::getInt64Ty(llvm_ctx)}, false),
       llvm::Function::ExternalLinkage, "malloc", module);
 
+  decls.puts_fn = llvm::Function::Create(
+      llvm::FunctionType::get(llvm::Type::getInt32Ty(llvm_ctx), {llvm::PointerType::get(llvm_ctx, 0)}, false),
+      llvm::Function::ExternalLinkage, "puts", module);
+
   return decls;
 }
 

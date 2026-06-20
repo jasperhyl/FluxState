@@ -268,6 +268,9 @@ bool BuildRunnerSource(const LoweredProgram &program, const ExecutableBuildOptio
          << "}\n\n";
 
   runner << "static int inject_initial_events(void) {\n";
+  if (options.debug) {
+    runner << "  system(\"echo inject_initial_events\");\n";
+  }
   for (size_t injection_index = 0; injection_index < options.injections.size(); ++injection_index) {
     const auto &injection = options.injections[injection_index];
     const LoweredMachine *machine = FindMachine(program, injection.machine_name);
@@ -352,8 +355,11 @@ bool BuildRunnerSource(const LoweredProgram &program, const ExecutableBuildOptio
   runner << "  return 0;\n";
   runner << "}\n\n";
 
-  runner << "int main(void) {\n"
-         << "  fs_module_init();\n"
+  runner << "int main(void) {\n";
+  if (options.debug) {
+    runner << "  system(\"echo main\");\n";
+  }
+  runner << "  fs_module_init();\n"
          << "  if (inject_initial_events() != 0) {\n"
          << "    fs_module_cleanup();\n"
          << "    return 1;\n"

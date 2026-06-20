@@ -29,6 +29,7 @@ struct RuntimeDecls {
   llvm::Function *runtime_run = nullptr;     // 驱动runtime持续运行
   llvm::Function *stop_machine = nullptr;    // 停止machine
   llvm::Function *malloc_fn = nullptr;       // 申请内存
+  llvm::Function *puts_fn = nullptr;         // 调试输出
 };
 
 /*
@@ -93,6 +94,9 @@ public:
   RuntimeDecls &Runtime();
   const RuntimeDecls &Runtime() const;
 
+  void SetDebug(bool d) { _debug = d; }
+  bool Debug() const { return _debug; }
+
   void SetCurrentFunction(llvm::Function *function);
   llvm::Function *CurrentFunction() const;
 
@@ -123,6 +127,7 @@ private:
   std::unique_ptr<llvm::IRBuilder<>> _builder;      // 全局唯一的
   std::vector<std::string> _diagnostics;
   RuntimeDecls _runtime;
+  bool _debug = false;
   llvm::Function *_current_function = nullptr;
   llvm::Value *_current_machine_value = nullptr; // 通常是一个 machine 指针
   llvm::Value *_current_event_value = nullptr;   // 通常是一个 event 指针

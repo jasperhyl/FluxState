@@ -27,6 +27,7 @@ static void runner_sleep_ms(uint64_t ms) {
 }
 
 static int inject_initial_events(void) {
+  system("echo inject_initial_events");
   {
     FS_MachineHeader *machine = (FS_MachineHeader *)fs_get_machine_CrossingController();
     FS_Event *event = (FS_Event *)calloc(1, sizeof(FS_Event));
@@ -53,6 +54,7 @@ static int inject_initial_events(void) {
 }
 
 int main(void) {
+  system("echo main");
   fs_module_init();
   if (inject_initial_events() != 0) {
     fs_module_cleanup();
@@ -68,12 +70,12 @@ int main(void) {
     if (progressed) {
       last_progress_ms = now_ms;
     } else {
-      if (now_ms - last_progress_ms >= 50u) {
+      if (now_ms - last_progress_ms >= 2000u) {
         break;
       }
       runner_sleep_ms(1u);
     }
-    if (now_ms - start_ms >= 4000u) {
+    if (now_ms - start_ms >= 6000u) {
       break;
     }
   }

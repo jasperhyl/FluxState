@@ -78,6 +78,17 @@ do {
 
 ## 运行演示
 
+### Docker（推荐）
+
+从仓库根目录执行：
+
+```bash
+docker build -t fluxstate .
+docker run --rm -v "${PWD}/test/present/out:/workspace/test/present/out" fluxstate ./test/present/run_demo.sh
+```
+
+### 本地
+
 从仓库根目录执行：
 
 ```bash
@@ -104,14 +115,30 @@ test/present/out/smart_crossing
 ./fluxstate_ir \
   --emit-exe test/present/out/smart_crossing \
   --inject CrossingController:PedButton:101 \
-  --idle-timeout-ms 50 \
-  --max-runtime-ms 4000 \
+  --idle-timeout-ms 2000 \
+  --max-runtime-ms 6000 \
+  --debug \
   test/present/smart_crossing.fs
 
 test/present/out/smart_crossing
 ```
 
 `--inject CrossingController:PedButton:101` 表示程序启动时，模拟 101 号行人按钮被按下。之后的黄灯、行人通行、闪烁提示、恢复车辆绿灯，都是 `.fs` 中的状态迁移和 timer 驱动出来的。
+
+`--debug` 选项会在运行时打印每条状态迁移轨迹：
+
+```text
+main
+inject_initial_events
+[CrossingController] VehicleGreen -> VehicleYellow
+[DisplayPanel] Cars -> Waiting
+[CrossingController] VehicleYellow -> PedWalk
+[DisplayPanel] Waiting -> Walk
+[CrossingController] PedWalk -> PedFlash
+[DisplayPanel] Walk -> Flashing
+[CrossingController] PedFlash -> VehicleGreen
+[DisplayPanel] Flashing -> Cars
+```
 
 ## 可以展示的编译器能力
 
@@ -131,7 +158,7 @@ test/present/out/smart_crossing
 
 ## 当前演示限制
 
-当前 runtime 还没有接入真实 I/O，所以可执行文件运行时不会打印“当前状态”。演示重点是证明 DSL 源码可以被编译、优化、链接并运行。状态图和 LLVM IR 是当前最直观的观察方式。
+当前 runtime 还没有接入真实 I/O。演示重点是证明 DSL 源码可以被编译、优化、链接并运行。可通过 `--debug` 选项观察运行时的状态迁移轨迹，也可通过 DOT / Mermaid 状态图进行静态分析。
 
 当前语言也还没有支持 `log()`、`this`、字符串比较和块内局部变量，因此示例代码刻意避开了这些语法。
 

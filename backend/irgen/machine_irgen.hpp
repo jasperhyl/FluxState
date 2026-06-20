@@ -21,6 +21,7 @@ public:
 
   void PrepareMachine(const LoweredMachine &machine);
   void EmitMachine(const LoweredMachine &machine);
+  void SetDebug(bool d) { _debug = d; }
 
 private:
   MachineIRLayout BuildLayout(const LoweredMachine &machine);
@@ -56,6 +57,7 @@ private:
   TypeConverter &_types;
   ExprIRGen &_expr_irgen;
   StmtIRGen &_stmt_irgen;
+  bool _debug = false;
 };
 
 } // namespace flux

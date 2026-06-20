@@ -100,14 +100,16 @@ void EmitMachineWrappers(IRGenContext &ctx, const LoweredMachine &machine) {
 
 } // namespace
 
-IRGenResult IRGen::Generate(const LoweredProgram &program, const std::string &module_name) {
+IRGenResult IRGen::Generate(const LoweredProgram &program, const std::string &module_name, bool debug) {
   IRGenContext ctx(module_name);
   TypeConverter types(ctx);
   ctx.SetRuntimeDecls(DeclareRuntimeDecls(ctx, types));
+  ctx.SetDebug(debug);
 
   ExprIRGen expr_irgen(ctx, types);
   StmtIRGen stmt_irgen(ctx, types, expr_irgen);
   MachineIRGen machine_irgen(ctx, types, expr_irgen, stmt_irgen);
+  machine_irgen.SetDebug(debug);
 
   ctx.Module().setTargetTriple(llvm::Triple("x86_64-unknown-linux-gnu"));
   for (const auto &machine : program.machines) {

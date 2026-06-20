@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 set -euo pipefail
 
@@ -30,8 +30,9 @@ echo "[demo] linking executable"
 "${COMPILER}" \
   --emit-exe "${OUT_DIR}/smart_crossing" \
   --inject CrossingController:PedButton:101 \
-  --idle-timeout-ms 50 \
-  --max-runtime-ms 4000 \
+  --idle-timeout-ms 2000 \
+  --max-runtime-ms 6000 \
+  --debug \
   "${SOURCE}"
 
 echo "[demo] running executable"

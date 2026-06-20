@@ -1,0 +1,7 @@
+.git
+fluxstate_ir
+test/present/out
+*.o
+*.ll
+*.dot
+*.mmd

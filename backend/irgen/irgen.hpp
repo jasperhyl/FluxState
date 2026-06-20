@@ -22,7 +22,8 @@ struct IRGenResult {
 
 class IRGen {
 public:
-  IRGenResult Generate(const LoweredProgram &program, const std::string &module_name = "flux_module");
+  IRGenResult Generate(const LoweredProgram &program, const std::string &module_name = "flux_module",
+                       bool debug = false);
 };
 
 } // namespace flux

@@ -1,4 +1,4 @@
-﻿// main.cpp
+// main.cpp
 #include "../backend/irgen/irgen.hpp"
 #include "../backend/lowering/lowering.hpp"
 #include "../backend/codegen/llvm_codegen.hpp"
@@ -96,13 +96,13 @@ int main(int argc, char *argv[]) {
   //   ./fluxstate_ir [--dot|--mermaid] [--O0|--O2] <source_file.fs>
   //   ./fluxstate_ir --emit-obj <output.o> [--O0|--O2] <source_file.fs>
   //   ./fluxstate_ir --emit-exe <output> [--inject Machine:Event[:args]] [--idle-timeout-ms N] [--max-runtime-ms N]
-  //                  [--O0|--O2] <source_file.fs>
+  //                  [--O0|--O2] [--debug] <source_file.fs>
   if (argc < 2) {
     std::cerr << "Usage: " << argv[0] << " [--dot|--mermaid] [--O0|--O2] <source_file.fs>\n"
               << "   or: " << argv[0] << " --emit-obj <output.o> [--O0|--O2] <source_file.fs>\n"
               << "   or: " << argv[0]
               << " --emit-exe <output> [--inject Machine:Event[:args]] [--idle-timeout-ms N] [--max-runtime-ms N]"
-                 " [--O0|--O2] <source_file.fs>\n";
+                 " [--O0|--O2] [--debug] <source_file.fs>\n";
     return 1;
   }
 
@@ -187,13 +187,15 @@ int main(int argc, char *argv[]) {
       optimization_level = flux::OptimizationLevel::O0;
     } else if (arg == "--O2") {
       optimization_level = flux::OptimizationLevel::O2;
+    } else if (arg == "--debug") {
+      executable_options.debug = true;
     } else {
       if (source_path != nullptr) {
         std::cerr << "Usage: " << argv[0] << " [--dot|--mermaid] [--O0|--O2] <source_file.fs>\n"
                   << "   or: " << argv[0] << " --emit-obj <output.o> [--O0|--O2] <source_file.fs>\n"
                   << "   or: " << argv[0]
                   << " --emit-exe <output> [--inject Machine:Event[:args]] [--idle-timeout-ms N] [--max-runtime-ms N]"
-                     " [--O0|--O2] <source_file.fs>\n";
+                     " [--O0|--O2] [--debug] <source_file.fs>\n";
         return 1;
       }
       source_path = argv[i];
@@ -205,7 +207,7 @@ int main(int argc, char *argv[]) {
               << "   or: " << argv[0] << " --emit-obj <output.o> [--O0|--O2] <source_file.fs>\n"
               << "   or: " << argv[0]
               << " --emit-exe <output> [--inject Machine:Event[:args]] [--idle-timeout-ms N] [--max-runtime-ms N]"
-                 " [--O0|--O2] <source_file.fs>\n";
+                 " [--O0|--O2] [--debug] <source_file.fs>\n";
     return 1;
   }
 
@@ -262,7 +264,7 @@ int main(int argc, char *argv[]) {
   }
 
   IRGen irgen;
-  IRGenResult irgen_result = irgen.Generate(lowering_result.program, source_path);
+  IRGenResult irgen_result = irgen.Generate(lowering_result.program, source_path, executable_options.debug);
   if (!irgen_result.Ok()) {
     PrintStringDiagnostics("irgen", irgen_result.diagnostics);
     return 1;

@@ -17,6 +17,7 @@ struct ExecutableBuildOptions {
   std::vector<EventInjectionSpec> injections;
   unsigned idle_timeout_ms = 100;
   unsigned max_runtime_ms = 1000;
+  bool debug = false;
 };
 
 bool BuildExecutable(const LoweredProgram &program, const std::string &user_object_path,

@@ -33,6 +33,29 @@ CLANGXX_BIN=clang++ LLVM_CONFIG_BIN=llvm-config ./build_ir.sh
 CC_BIN=/path/to/clang ./fluxstate_ir --emit-exe /tmp/program test/test.fs
 ```
 
+### Docker 环境
+
+项目提供了 LLVM 19 的 Docker 镜像，无需安装本地依赖：
+
+```bash
+docker build -t fluxstate .
+docker run -it fluxstate
+```
+
+进入容器后可直接使用编译器和运行测试：
+
+```bash
+./fluxstate_ir test/test.fs > test/test.ll
+bash test/run_tests.sh
+bash test/present/run_demo.sh
+```
+
+也可挂载本地目录运行：
+
+```bash
+docker run --rm -v "${PWD}/test/present/out:/workspace/test/present/out" fluxstate ./test/present/run_demo.sh
+```
+
 ## 构建
 
 ```bash
@@ -92,6 +115,24 @@ CC_BIN=/path/to/clang ./fluxstate_ir --emit-exe /tmp/program test/test.fs
   test/test.fs
 
 /tmp/program
+```
+
+启用 `--debug` 可在运行时打印状态迁移轨迹：
+
+```bash
+./fluxstate_ir --emit-exe /tmp/program --debug test/test.fs
+/tmp/program
+```
+
+输出示例：
+
+```text
+main
+inject_initial_events
+[CrossingController] VehicleGreen -> VehicleYellow
+[DisplayPanel] Cars -> Waiting
+[CrossingController] VehicleYellow -> PedWalk
+...
 ```
 
 `--inject` 的格式是：

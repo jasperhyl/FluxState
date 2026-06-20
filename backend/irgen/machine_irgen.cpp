@@ -394,6 +394,18 @@ void MachineIRGen::EmitExecuteTransition(const LoweredMachine &machine, const Ma
     _ctx.Builder().CreateCall(action_function, {machine_value, event_value});
   }
 
+  if (_debug) {
+    std::string src_name = "?";
+    std::string dst_name = "?";
+    for (const auto &state : machine.states) {
+      if (state.tag == transition.src_state_tag) src_name = state.name;
+      if (state.tag == transition.dst_state_tag) dst_name = state.name;
+    }
+    std::string msg = "[" + machine.name + "] " + src_name + " -> " + dst_name;
+    llvm::Value *msg_ptr = _ctx.Builder().CreateGlobalString(msg, "dbg.tr");
+    _ctx.Builder().CreateCall(_ctx.Runtime().puts_fn, {msg_ptr});
+  }
+
   // 准备离开 src_state，那么这个状态下挂着的 after / timeout 定时器应该取消掉
   EmitCancelTimersForState(machine, transition.src_state_tag, header_ptr);
   // 把当前状态写成目标状态

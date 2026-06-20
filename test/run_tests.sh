@@ -78,7 +78,7 @@ log "emitting object file"
 assert_file_nonempty "${TMP_DIR}/program.o"
 
 log "linking and running executable without initial events"
-"${COMPILER}" --emit-exe "${TMP_DIR}/idle_program" --idle-timeout-ms 10 --max-runtime-ms 100 "${FIXTURE}"
+"${COMPILER}" --emit-exe "${TMP_DIR}/idle_program" --idle-timeout-ms 10 --max-runtime-ms 100 --debug "${FIXTURE}"
 "${TMP_DIR}/idle_program"
 
 log "linking and running executable with injected events"
@@ -88,6 +88,7 @@ log "linking and running executable with injected events"
   --inject SyntaxCoverage:Configure:7,2,1.5,8.0,A,true,configured \
   --idle-timeout-ms 20 \
   --max-runtime-ms 300 \
+  --debug \
   "${FIXTURE}"
 "${TMP_DIR}/injected_program"
 
